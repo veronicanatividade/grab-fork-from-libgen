@@ -4,6 +4,9 @@ from grab_fork_from_libgen.search import LibgenSearch
 from grab_fork_from_libgen.metadata import Metadata
 
 
+# TODO: implement async class tests
+
+
 class TestLibgenSearch(unittest.TestCase):
     def setUp(self):
         self.parameters = {
