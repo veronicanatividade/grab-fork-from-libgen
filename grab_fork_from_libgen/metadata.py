@@ -27,80 +27,42 @@ class Metadata:
         # Common paterns for URLs used here.
         self._liblol_base = "http://library.lol"
         self._librocks_base = "http://libgen.rocks/ads.php?md5="
-        self._3lib_base = "http://3lib.net/md5/"
         self._libgen_fiction_base = "http://libgen.is/fiction/"
         self._libgen_scitech_base = "http://libgen.is/book/index.php?md5="
 
     def get_cover(self, md5: str) -> str:
         session = HTMLSession()
-        # Both 3lib and LibraryRocks doesn't use CORS in their cover images.
+        # LibraryRocks doesn't use CORS in their cover images.
 
-        _3lib = self._3lib_base + md5
         librocks = self._librocks_base + md5
 
-        # This function will try for both 3lib and libraryrocks.
         try:
-            page = session.get(_3lib, headers=get_request_headers(), timeout=self.timeout, verify=False)
-            # If 3lib is up.
-            _3libup = True
+            page = session.get(
+                librocks,
+                headers=get_request_headers(),
+                timeout=self.timeout,
+                verify=False,
+            )
 
-        except (exceptions.Timeout, exceptions.ConnectionError, exceptions.HTTPError):
-            # If 3lib is down.
-            _3libup = False
-            try:
-                page = session.get(librocks, headers=get_request_headers(), timeout=self.timeout, verify=False)
-
-            except (exceptions.Timeout, exceptions.ConnectionError, exceptions.HTTPError) as err:
-                raise MetadataError("Both 3lib and LibraryRocks failed to connect. The last error was: ", err)
+        except (
+            exceptions.Timeout,
+            exceptions.ConnectionError,
+            exceptions.HTTPError,
+        ) as err:
+            raise MetadataError("LibraryRocks failed to connect. The error was: ", err)
 
         soup = BeautifulSoup(page.html.raw_html, "html.parser")
 
-        if _3libup:
-            # if 3lib is up
-            cover = soup.find("img", {"class": "cover"})
-            try:
-                # 3lib returns a very small cover on the search page, this changes the url to render the bigger one.
-                if cover.has_attr("data-src"):
-                    cover_url = re.sub("covers100", "covers299", cover["data-src"])
-                else:
-                    raise TypeError
+        try:
+            cover = soup.select("img:last-of-type")[1]
 
-            except TypeError:
+            if cover is not None:
+                cover_url = f"https://libgen.rocks{cover['src']}"
+            else:
                 raise MetadataError("Could not find cover for this specific md5.")
 
-            except KeyError:
-                # Sometimes there's no covers299 version of the cover.
-                try:
-                    if cover.has_attr("data-src"):
-                        cover_url = re.sub("covers100", "covers200", cover["data-src"])
-                    else:
-                        raise TypeError
-
-                except TypeError:
-                    raise MetadataError("Could not find cover for this specific md5.")
-
-                except KeyError:
-                    raise MetadataError("Could not find cover for this specific md5.")
-
-            if cover_url == "/img/cover-not-exists.png":
-                # This image doesn't actually render,
-                # So sending this link is equivalent.
-
-                cover_url = "https://libgen.rocks/img/blank.png"
-        else:
-            # if 3lib is down
-            try:
-                cover = soup.select("img:last-of-type")[1]
-
-                if cover is not None:
-                    cover_url = "https://libgen.rocks" + cover["src"]
-                else:
-                    raise TypeError
-
-            except KeyError:
-                raise MetadataError("Could not find cover for this specific md5.")
-            except TypeError:
-                raise MetadataError("Could not find cover for this specific md5.")
+        except (KeyError, IndexError, TypeError):
+            raise MetadataError("Could not find cover for this specific md5.")
 
         return cover_url
 
@@ -108,9 +70,15 @@ class Metadata:
         session = HTMLSession()
         url = self._libgen_fiction_base + md5
         try:
-            page = session.get(url, headers=get_request_headers(), timeout=self.timeout, verify=False)
+            page = session.get(
+                url, headers=get_request_headers(), timeout=self.timeout, verify=False
+            )
             page.raise_for_status()
-        except (exceptions.Timeout, exceptions.ConnectionError, exceptions.HTTPError) as err:
+        except (
+            exceptions.Timeout,
+            exceptions.ConnectionError,
+            exceptions.HTTPError,
+        ) as err:
             raise MetadataError("Error while connecting to Libgen: ", err)
 
         soup = BeautifulSoup(page.html.raw_html, "lxml")
@@ -136,16 +104,22 @@ class Metadata:
             "topic": "fiction",
             "extension": fiction_field_value("Format:", soup),
             "size": fiction_field_value("File size:", soup),
-            "description": description
+            "description": description,
         }
 
     def _get_scitech_metadata(self, md5: str):
         session = HTMLSession()
         url = self._libgen_scitech_base + md5
         try:
-            page = session.get(url, headers=get_request_headers(), timeout=self.timeout, verify=False)
+            page = session.get(
+                url, headers=get_request_headers(), timeout=self.timeout, verify=False
+            )
             page.raise_for_status()
-        except (exceptions.Timeout, exceptions.ConnectionError, exceptions.HTTPError) as err:
+        except (
+            exceptions.Timeout,
+            exceptions.ConnectionError,
+            exceptions.HTTPError,
+        ) as err:
             raise MetadataError("Error while connecting to Libgen: ", err)
 
         soup = BeautifulSoup(page.html.raw_html, "lxml")
@@ -172,7 +146,7 @@ class Metadata:
             "topic": "sci-tech",
             "extension": scitech_field_value("Extension:", soup),
             "size": scitech_field_value("Size:", soup),
-            "description": description
+            "description": description,
         }
 
     def get_metadata(self, md5: str, topic: str):
@@ -187,7 +161,9 @@ class Metadata:
         elif topic == "fiction":
             return self._get_fiction_metadata(md5)
         else:
-            raise MetadataError("Topic is not valid. Valid topics are \"fiction\" and \"sci-tech\".")
+            raise MetadataError(
+                'Topic is not valid. Valid topics are "fiction" and "sci-tech".'
+            )
 
     def get_download_links(self, md5: str, topic: str):
         session = HTMLSession()
@@ -202,7 +178,9 @@ class Metadata:
         elif topic == "fiction":
             topic_url = "/fiction/"
         else:
-            raise MetadataError("Topic is not valid. Valid topics are \"fiction\" and \"sci-tech\".")
+            raise MetadataError(
+                'Topic is not valid. Valid topics are "fiction" and "sci-tech".'
+            )
 
         url = self._liblol_base + topic_url + md5
 
@@ -211,9 +189,15 @@ class Metadata:
         # Ideally, this should only be done once the users actually wants to download a book.
 
         try:
-            page = session.get(url, headers=get_request_headers(), timeout=self.timeout, verify=False)
+            page = session.get(
+                url, headers=get_request_headers(), timeout=self.timeout, verify=False
+            )
             page.raise_for_status()
-        except (exceptions.Timeout, exceptions.ConnectionError, exceptions.HTTPError) as err:
+        except (
+            exceptions.Timeout,
+            exceptions.ConnectionError,
+            exceptions.HTTPError,
+        ) as err:
             raise MetadataError("Error while connecting to Librarylol: ", err)
 
         soup = BeautifulSoup(page.html.raw_html, "html.parser")
