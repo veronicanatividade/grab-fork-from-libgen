@@ -124,7 +124,7 @@ class LibgenSearch:
         if pagination:
             has_next_page: bool = False
 
-            resp.html.render()
+            resp.html.arender()
             try:
                 soup = BeautifulSoup(resp.html.raw_html, "lxml")
                 paginator = soup.find("div", {"id": "paginator_example_bottom"})
@@ -180,7 +180,7 @@ class LibgenSearch:
             has_next_page: bool = False
 
             # This renders the page and enables javascript-based content
-            resp.html.render()
+            resp.html.arender()
             try:
                 soup = BeautifulSoup(resp.html.raw_html, "lxml")
                 # Selects the third select element on the page, which is the pagination one.
